@@ -1,73 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Face Detection Web</title>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
   <style>
     body {
       margin: 0;
+      padding: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      background: #f0f0f0;
-      height: 100vh;
-    }
-    video, canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
-    #status {
-      position: absolute;
-      top: 10px;
-      background: rgba(0, 0, 0, 0.6);
-      color: white;
-      padding: 6px 14px;
-      border-radius: 8px;
+      background-color: #eee;
       font-family: sans-serif;
-      font-size: 14px;
+    }
+    video {
+      border: 1px solid black;
+      margin-top: 20px;
+    }
+    #loading {
+      margin-top: 50px;
+      font-weight: bold;
+      background: #444;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
     }
   </style>
 </head>
 <body>
-  <div id="status">Loading models...</div>
+  <div id="loading">Loading models...</div>
   <video id="video" width="720" height="560" autoplay muted></video>
-  <canvas id="overlay" width="720" height="560"></canvas>
 
   <script>
     const video = document.getElementById('video');
-    const overlay = document.getElementById('overlay');
-    const context = overlay.getContext('2d');
-    const status = document.getElementById('status');
+    const loadingText = document.getElementById('loading');
 
-    // Load models from local ./models folder
-    Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
-    ]).then(startVideo);
-
-    function startVideo() {
-      navigator.mediaDevices.getUserMedia({ video: {} })
-        .then(stream => {
-          video.srcObject = stream;
-          status.textContent = "Camera aktif. Tunggu deteksi wajah...";
-        })
-        .catch(err => {
-          status.textContent = "Gagal akses kamera: " + err.message;
-          console.error(err);
-        });
+    async function startVideo() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+        video.srcObject = stream;
+        loadingText.style.display = 'none';
+      } catch (err) {
+        console.error("Failed to access webcam:", err);
+        loadingText.textContent = "Failed to access webcam.";
+      }
     }
 
+    Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri('models')
+    ]).then(startVideo).catch(err => {
+      loadingText.textContent = "Failed to load models.";
+      console.error("Model load error:", err);
+    });
+
     video.addEventListener('play', () => {
+      const canvas = faceapi.createCanvasFromMedia(video);
+      document.body.append(canvas);
       const displaySize = { width: video.width, height: video.height };
-      faceapi.matchDimensions(overlay, displaySize);
+      faceapi.matchDimensions(canvas, displaySize);
 
       setInterval(async () => {
         const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
         const resized = faceapi.resizeResults(detections, displaySize);
-        context.clearRect(0, 0, overlay.width, overlay.height);
-        faceapi.draw.drawDetections(overlay, resized);
+        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        faceapi.draw.drawDetections(canvas, resized);
       }, 100);
     });
   </script>
