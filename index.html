@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Face Detection Web</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #f0f0f0;
+      height: 100vh;
+    }
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    #status {
+      position: absolute;
+      top: 10px;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Loading models...</div>
+  <video id="video" width="720" height="560" autoplay muted></video>
+  <canvas id="overlay" width="720" height="560"></canvas>
+
+  <script>
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const context = overlay.getContext('2d');
+    const status = document.getElementById('status');
+
+    Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models'),
+    ]).then(startVideo);
+
+    function startVideo() {
+      navigator.mediaDevices.getUserMedia({ video: {} })
+        .then((stream) => {
+          video.srcObject = stream;
+          status.textContent = "Camera aktif. Deteksi wajah dimulai.";
+        })
+        .catch((err) => {
+          status.textContent = "Gagal akses kamera.";
+          console.error(err);
+        });
+    }
+
+    video.addEventListener('play', () => {
+      const displaySize = { width: video.width, height: video.height };
+      faceapi.matchDimensions(overlay, displaySize);
+
+      setInterval(async () => {
+        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
+        const resizedDetections = faceapi.resizeResults(detections, displaySize);
+
+        context.clearRect(0, 0, overlay.width, overlay.height);
+        faceapi.draw.drawDetections(overlay, resizedDetections);
+      }, 100);
+    });
+  </script>
+</body>
+</html>
